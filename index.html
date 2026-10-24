@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>RoboCab Tycoon</title>
+<style>
+  :root { --panel: rgba(17, 24, 39, 0.88); --line: rgba(255,255,255,0.12); --acc: #facc15; --good: #4ade80; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1f2937; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #f9fafb; -webkit-user-select: none; user-select: none; }
+  #game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(4px); box-shadow: 0 6px 24px rgba(0,0,0,0.35); }
+  #hud-cash { position: fixed; top: 12px; left: 12px; padding: 10px 14px; min-width: 170px; }
+  #cash { font-size: 30px; font-weight: 800; color: #86efac; letter-spacing: 0.5px; font-variant-numeric: tabular-nums; }
+  #rate { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+  #speed { color: var(--acc); font-weight: 700; font-size: 12px; }
+  #goal { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); width: min(380px, calc(100vw - 420px)); min-width: 230px; padding: 10px 14px; cursor: pointer; }
+  #goal-step { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--acc); font-weight: 700; }
+  #goal-title { font-size: 17px; font-weight: 800; margin: 2px 0; }
+  #goal-hint { font-size: 12px; opacity: 0.8; }
+  .bar { height: 8px; background: rgba(255,255,255,0.12); border-radius: 6px; overflow: hidden; margin-top: 7px; }
+  #goal-bar { height: 100%; width: 0; background: linear-gradient(90deg, #60a5fa, #a78bfa); transition: width 0.2s; }
+  #goal-bar.ready { background: linear-gradient(90deg, #22c55e, #86efac); }
+  #goal-cost { font-size: 11px; opacity: 0.8; margin-top: 3px; text-align: right; font-variant-numeric: tabular-nums; }
+  #goal.flash { animation: flash 0.9s ease; }
+  @keyframes flash { 0% { transform: translateX(-50%) scale(1); } 30% { transform: translateX(-50%) scale(1.08); box-shadow: 0 0 0 4px var(--acc); } 100% { transform: translateX(-50%) scale(1); } }
+  #buttons { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; }
+  .btn { background: var(--panel); color: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn:hover { border-color: rgba(255,255,255,0.35); }
+  #shop-btn { background: linear-gradient(180deg, #f59e0b, #d97706); border-color: #fbbf24; }
+  #shop-badge { display: none; background: #ef4444; border-radius: 10px; padding: 1px 7px; font-size: 12px; margin-left: 4px; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.15); } }
+  #status { position: fixed; left: 12px; bottom: 12px; padding: 10px 14px; width: min(340px, calc(100vw - 24px)); font-size: 13px; }
+  #mode { font-weight: 700; margin-bottom: 6px; }
+  #batt { margin-bottom: 6px; }
+  #batt .bar { height: 12px; margin: 4px 0 0; }
+  #batt-fill { height: 100%; transition: width 0.15s; }
+  #batt-fill.hi { background: var(--good); } #batt-fill.mid { background: var(--acc); } #batt-fill.lo { background: #f87171; animation: blink 0.8s infinite; }
+  @keyframes blink { 50% { opacity: 0.5; } }
+  .dim { opacity: 0.75; } .warn { color: var(--acc); }
+  #shop { position: fixed; top: 70px; right: 12px; bottom: 12px; width: min(380px, calc(100vw - 24px)); padding: 12px; display: flex; flex-direction: column; transform: translateX(110%); transition: transform 0.25s ease; }
+  #shop.open { transform: none; }
+  #shop header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  #shop h2 { margin: 0; font-size: 18px; }
+  #shop-list { overflow-y: auto; flex: 1; padding-right: 2px; }
+  .item { display: flex; gap: 10px; align-items: center; padding: 9px; border-radius: 10px; border: 1px solid transparent; margin-bottom: 6px; background: rgba(255,255,255,0.04); }
+  .item .icon { font-size: 24px; width: 34px; text-align: center; }
+  .item .info { flex: 1; min-width: 0; }
+  .item .name { font-weight: 700; font-size: 14px; }
+  .item .desc { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+  .item .pips span { display: inline-block; width: 10px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); margin: 4px 3px 0 0; }
+  .item .pips span.on { background: var(--acc); }
+  .item .buy { min-width: 76px; padding: 8px 10px; border-radius: 9px; border: none; font-weight: 800; font-size: 13px; background: #22c55e; color: #052e14; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .item .buy:disabled { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.55); cursor: default; }
+  .item.can { border-color: rgba(74,222,128,0.5); }
+  .item.goal { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+  .item.locked { opacity: 0.55; }
+  .item.maxed { opacity: 0.45; }
+  .item.shake { animation: shake 0.3s; }
+  @keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+  #toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); opacity: 0; padding: 12px 18px; font-weight: 700; font-size: 15px; transition: all 0.3s; pointer-events: none; max-width: calc(100vw - 40px); text-align: center; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #help { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
+  #help.open { display: flex; }
+  #help .card { max-width: 460px; padding: 22px; margin: 16px; line-height: 1.45; font-size: 14px; }
+  #help h1 { margin: 0 0 6px; font-size: 24px; } #help h1 span { color: var(--acc); }
+  #help kbd { background: #374151; border-radius: 5px; padding: 1px 6px; font-size: 12px; border-bottom: 2px solid #111827; }
+  #help ul { padding-left: 18px; margin: 8px 0; }
+  #help .go { margin-top: 10px; width: 100%; background: linear-gradient(180deg, #22c55e, #16a34a); border-color: #4ade80; font-size: 17px; }
+  #debug { position: fixed; right: 12px; bottom: 12px; display: none; white-space: pre; font: 11px monospace; padding: 8px; pointer-events: none; }
+  @media (max-width: 760px) {
+    #goal { top: 104px; width: calc(100vw - 24px); padding: 8px 12px; } #goal-title { font-size: 15px; } #goal-hint { display: none; }
+    #hud-cash { min-width: 0; } #cash { font-size: 22px; }
+    #status { font-size: 12px; }
+    #toast { bottom: 170px; }
+    #shop { top: 104px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud-cash" class="panel">
+  <div id="cash">$0</div>
+  <div id="rate">$0/min</div>
+  <div id="speed"></div>
+</div>
+
+<div id="goal" class="panel" title="Open shop">
+  <div id="goal-step">Goal 1/8</div>
+  <div id="goal-title">Pick up your first rider</div>
+  <div id="goal-hint"></div>
+  <div class="bar"><div id="goal-bar"></div></div>
+  <div id="goal-cost"></div>
+</div>
+
+<div id="buttons">
+  <button id="help-btn" class="btn" title="Help (H)">?</button>
+  <button id="mute-btn" class="btn" title="Sound">🔊</button>
+  <button id="shop-btn" class="btn" title="Shop (B)">🛒 Shop<span id="shop-badge">0</span></button>
+</div>
+
+<div id="status" class="panel">
+  <div id="mode">Driving</div>
+  <div id="batt"><div id="batt-label">🔋 100%</div><div class="bar"><div id="batt-fill" class="hi"></div></div></div>
+  <div id="seats"></div>
+  <div id="fleet"></div>
+</div>
+
+<div id="shop" class="panel">
+  <header><h2>🛒 Upgrades</h2><button id="shop-close" class="btn">✕</button></header>
+  <div id="shop-list"></div>
+</div>
+
+<div id="toast" class="panel"></div>
+<div id="debug" class="panel"></div>
+
+<div id="help">
+  <div class="card panel">
+    <h1>Robo<span>Cab</span> Tycoon</h1>
+    <div>Start with one electric cab and your home garage. Grow it into a self-driving fleet.</div>
+    <ul>
+      <li><b>Drive:</b> <kbd>W A S D</kbd> / arrow keys, or drag on the screen (touch joystick).</li>
+      <li><b>Riders:</b> drive onto a waving rider, then to their flag to get paid.</li>
+      <li><b>Charge:</b> park on the yellow pad at HOME. Empty battery = crawling speed.</li>
+      <li><b>Shop:</b> <kbd>B</kbd> or 🛒. Speed, battery, seats, then self-driving.</li>
+      <li><b>Later:</b> walk up to cabs flashing 🔌 to plug them in, until a robot does it for you.</li>
+    </ul>
+    <div class="dim" style="font-size:12px">Testing cheats: <kbd>Shift+M</kbd> +$1k · <kbd>Shift+K</kbd> +$10k · <kbd>Shift+T</kbd> game speed 1/2/4/8x · <kbd>Shift+R</kbd> reset save · <kbd>H</kbd> this help</div>
+    <button id="help-close" class="btn go">Let's drive!</button>
+  </div>
+</div>
+
+<script src="js/economy.js"></script>
+<script src="js/world.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
